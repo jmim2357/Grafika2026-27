@@ -1,7 +1,7 @@
 ﻿using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 
-namespace Lab1
+namespace Szeminarium1
 {
     internal static class Program
     {
@@ -15,7 +15,7 @@ namespace Lab1
         #version 330 core
         layout (location = 0) in vec3 vPos;
 		layout (location = 1) in vec4 vCol;
-
+ 
 		out vec4 outCol;
         
         void main()
@@ -31,7 +31,7 @@ namespace Lab1
         out vec4 FragColor;
 		
 		in vec4 outCol;
-
+ 
         void main()
         {
             FragColor = outCol;
@@ -41,7 +41,7 @@ namespace Lab1
         static void Main(string[] args)
         {
             WindowOptions windowOptions = WindowOptions.Default;
-            windowOptions.Title = "1. szeminárium - háromszög";
+            windowOptions.Title = "kocka";
             windowOptions.Size = new Silk.NET.Maths.Vector2D<int>(500, 500);
 
             graphicWindow = Window.Create(windowOptions);
@@ -55,9 +55,6 @@ namespace Lab1
 
         private static void GraphicWindow_Load()
         {
-            // egszeri beallitasokat
-            //Console.WriteLine("Loaded");
-
             Gl = graphicWindow.CreateOpenGL();
 
             Gl.ClearColor(System.Drawing.Color.White);
@@ -73,6 +70,9 @@ namespace Lab1
 
             Gl.ShaderSource(fshader, FragmentShaderSource);
             Gl.CompileShader(fshader);
+            Gl.GetShader(fshader, ShaderParameterName.CompileStatus, out int fStatus);
+            if (fStatus != (int)GLEnum.True)
+                throw new Exception("Fragment shader failed to compile: " + Gl.GetShaderInfoLog(fshader));
 
             program = Gl.CreateProgram();
             Gl.AttachShader(program, vshader);
@@ -88,42 +88,66 @@ namespace Lab1
             {
                 Console.WriteLine($"Error linking shader {Gl.GetProgramInfoLog(program)}");
             }
-
         }
 
         private static void GraphicWindow_Update(double deltaTime)
         {
             // NO GL
             // make it threadsave
-            //Console.WriteLine($"Update after {deltaTime} [s]");
         }
 
         private static unsafe void GraphicWindow_Render(double deltaTime)
         {
-            //Console.WriteLine($"Render after {deltaTime} [s]");
-
             Gl.Clear(ClearBufferMask.ColorBufferBit);
 
             uint vao = Gl.GenVertexArray();
             Gl.BindVertexArray(vao);
 
             float[] vertexArray = new float[] {
-                -0.5f, -0.5f, 0.0f,
-                +0.5f, -0.5f, 0.0f,
-                 0.0f, +0.5f, 0.0f,
-                 1f, 1f, 0f
+                // elülső lap (0..3)
+                -0.6f, -0.6f, 0.0f,
+                +0.2f, -0.6f, 0.0f,
+                +0.2f, +0.2f, 0.0f,
+                -0.6f, +0.2f, 0.0f,
+ 
+                // felső lap (4..7)
+                -0.6f, +0.2f, 0.0f,
+                +0.2f, +0.2f, 0.0f,
+                +0.6f, +0.6f, 0.0f,
+                -0.2f, +0.6f, 0.0f,
+ 
+                // jobb oldali lap (8..11)
+                +0.2f, -0.6f, 0.0f,
+                +0.6f, -0.2f, 0.0f,
+                +0.6f, +0.6f, 0.0f,
+                +0.2f, +0.2f, 0.0f,
             };
 
             float[] colorArray = new float[] {
+                // elülső lap: piros
                 1.0f, 0.0f, 0.0f, 1.0f,
-                0.0f, 1.0f, 0.0f, 1.0f,
+                1.0f, 0.0f, 0.0f, 1.0f,
+                1.0f, 0.0f, 0.0f, 1.0f,
+                1.0f, 0.0f, 0.0f, 1.0f,
+ 
+                // felső lap: zöld
+                0.0f, 0.8f, 0.0f, 1.0f,
+                0.0f, 0.8f, 0.0f, 1.0f,
+                0.0f, 0.8f, 0.0f, 1.0f,
+                0.0f, 0.8f, 0.0f, 1.0f,
+ 
+                // jobb oldali lap: kék
                 0.0f, 0.0f, 1.0f, 1.0f,
-                1.0f, 0.0f, 0.0f, 1.0f,
+                0.0f, 0.0f, 1.0f, 1.0f,
+                0.0f, 0.0f, 1.0f, 1.0f,
+                0.0f, 0.0f, 1.0f, 1.0f,
             };
 
+            // minden lap két háromszög
             uint[] indexArray = new uint[] {
-                0, 1, 2,
-                2, 1, 3
+                0, 1, 2,   0, 2, 3,      // elülső
+                4, 5, 6,   4, 6, 7,      // felső
+                8, 9, 10,  8, 10, 11     // jobb oldali
             };
 
             uint vertices = Gl.GenBuffer();
@@ -148,7 +172,7 @@ namespace Lab1
 
             Gl.DrawElements(GLEnum.Triangles, (uint)indexArray.Length, GLEnum.UnsignedInt, null); // we used element buffer
             Gl.BindBuffer(GLEnum.ElementArrayBuffer, 0);
-            Gl.BindVertexArray(vao);
+            Gl.BindVertexArray(0);
 
             // always unbound the vertex buffer first, so no halfway results are displayed by accident
             Gl.DeleteBuffer(vertices);
