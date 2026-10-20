@@ -1,4 +1,5 @@
-﻿using Silk.NET.OpenGL;
+﻿
+using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 
 namespace Lab1
@@ -11,26 +12,50 @@ namespace Lab1
 
         private static uint program;
 
+        // Uj: Itt valaszthato ki, melyik hibat szeretnenk kiprobalni.
+        // 0 = nincs hiba
+        // 1 = hibas vertex shader
+        // 2 = hibas fragment shader
+        // 3 = AttachShader kihagyasa
+        // 4 = LinkProgram kihagyasa
+        // 5 = BindBuffer kihagyasa
+        // 6 = EnableVertexAttribArray(0) kihagyasa
+        // 7 = hibas attribútumindex
+        // 8 = hibas vertexindex
+        // 9 = BufferData elott nincs buffer kotve
+        // 10 = LinkProgram a CompileShader elott
+        private static int TestError = 9;
+
+        // Uj: OpenGL globalis hibakezeles
+        private static void CheckGlError(string location)
+        {
+            GLEnum error;
+
+            while ((error = Gl.GetError()) != GLEnum.NoError)
+            {
+                Console.WriteLine($"OpenGL hiba itt: {location} - {error}");
+            }
+        }
+
         private static readonly string VertexShaderSource = @"
         #version 330 core
         layout (location = 0) in vec3 vPos;
-		layout (location = 1) in vec4 vCol;
+        layout (location = 1) in vec4 vCol;
 
-		out vec4 outCol;
-        
+        out vec4 outCol;
+
         void main()
         {
-			outCol = vCol;
+            outCol = vCol;
             gl_Position = vec4(vPos.x, vPos.y, vPos.z, 1.0);
         }
         ";
 
-
         private static readonly string FragmentShaderSource = @"
         #version 330 core
         out vec4 FragColor;
-		
-		in vec4 outCol;
+
+        in vec4 outCol;
 
         void main()
         {
@@ -59,36 +84,91 @@ namespace Lab1
             //Console.WriteLine("Loaded");
 
             Gl = graphicWindow.CreateOpenGL();
+            CheckGlError("OpenGL inicializalas");
 
             Gl.ClearColor(System.Drawing.Color.White);
+            CheckGlError("ClearColor");
+
+            string vertexSource = VertexShaderSource;
+            string fragmentSource = FragmentShaderSource;
+
+            // Uj: Shader stringek szandekos elrontasa
+            if (TestError == 1)
+                vertexSource = vertexSource.Replace(
+                    "vec4(vPos.x, vPos.y, vPos.z, 1.0)",
+                    "vec4(vPos.x, vPos.y, )");
+
+            if (TestError == 2)
+                fragmentSource = fragmentSource.Replace(
+                    "FragColor = outCol;",
+                    "FragColor = ;");
 
             uint vshader = Gl.CreateShader(ShaderType.VertexShader);
             uint fshader = Gl.CreateShader(ShaderType.FragmentShader);
+            CheckGlError("Shader objektumok letrehozasa");
 
-            Gl.ShaderSource(vshader, VertexShaderSource);
+            Gl.ShaderSource(vshader, vertexSource);
+
+            // Uj: 10-es tesztben a linkeles a forditas elott tortenik.
+            if (TestError == 10)
+            {
+                program = Gl.CreateProgram();
+                Gl.AttachShader(program, vshader);
+                Gl.AttachShader(program, fshader);
+                Gl.LinkProgram(program);
+                CheckGlError("Linkeles CompileShader elott");
+            }
+
             Gl.CompileShader(vshader);
+            CheckGlError("Vertex shader forditasa");
+
             Gl.GetShader(vshader, ShaderParameterName.CompileStatus, out int vStatus);
             if (vStatus != (int)GLEnum.True)
-                throw new Exception("Vertex shader failed to compile: " + Gl.GetShaderInfoLog(vshader));
+                Console.WriteLine("Vertex shader hiba: " + Gl.GetShaderInfoLog(vshader));
 
-            Gl.ShaderSource(fshader, FragmentShaderSource);
+            Gl.ShaderSource(fshader, fragmentSource);
             Gl.CompileShader(fshader);
+            CheckGlError("Fragment shader forditasa");
+
+            Gl.GetShader(fshader, ShaderParameterName.CompileStatus, out int fStatus);
+            if (fStatus != (int)GLEnum.True)
+                Console.WriteLine("Fragment shader hiba: " + Gl.GetShaderInfoLog(fshader));
 
             program = Gl.CreateProgram();
+            CheckGlError("Program letrehozasa");
+
             Gl.AttachShader(program, vshader);
-            Gl.AttachShader(program, fshader);
-            Gl.LinkProgram(program);
+
+            // Uj: 3-as tesztben kihagyjuk a fragment shader csatolasat.
+            if (TestError != 3)
+                Gl.AttachShader(program, fshader);
+
+            CheckGlError("Shaderek csatolasa");
+
+            // Uj: 4-es tesztben kihagyjuk a linkelest.
+            if (TestError != 4 && TestError != 10)
+                Gl.LinkProgram(program);
+
+            CheckGlError("Program linkelese");
+
+            Gl.GetProgram(program, GLEnum.LinkStatus, out var status);
+
+            if (status == 0)
+            {
+                Console.WriteLine(
+                    $"Error linking shader: {Gl.GetProgramInfoLog(program)}");
+
+                CheckGlError("Program linkeles ellenorzese");
+
+                // A program nincs megfeleloen linkelve, ne folytassuk.
+                throw new Exception("A shaderprogram linkelese sikertelen.");
+            }
+
             Gl.DetachShader(program, vshader);
             Gl.DetachShader(program, fshader);
             Gl.DeleteShader(vshader);
             Gl.DeleteShader(fshader);
-
-            Gl.GetProgram(program, GLEnum.LinkStatus, out var status);
-            if (status == 0)
-            {
-                Console.WriteLine($"Error linking shader {Gl.GetProgramInfoLog(program)}");
-            }
-
+            CheckGlError("Shaderek levalasztasa es torlese");
         }
 
         private static void GraphicWindow_Update(double deltaTime)
@@ -103,9 +183,11 @@ namespace Lab1
             //Console.WriteLine($"Render after {deltaTime} [s]");
 
             Gl.Clear(ClearBufferMask.ColorBufferBit);
+            CheckGlError("Kepernyo torlese");
 
             uint vao = Gl.GenVertexArray();
             Gl.BindVertexArray(vao);
+            CheckGlError("VAO letrehozasa es kotese");
 
             float[] vertexArray = new float[] {
                 -0.5f, -0.5f, 0.0f,
@@ -126,27 +208,71 @@ namespace Lab1
                 2, 1, 3
             };
 
+            // Uj: 8-as tesztben ervenytelen vertexindexet hasznalunk.
+            if (TestError == 8)
+                indexArray[2] = 20;
+
             uint vertices = Gl.GenBuffer();
-            Gl.BindBuffer(GLEnum.ArrayBuffer, vertices);
+
+            // Uj: 5-os tesztben kihagyjuk a buffer kotest.
+            if (TestError != 5 && TestError != 9)
+                Gl.BindBuffer(GLEnum.ArrayBuffer, vertices);
+
+            CheckGlError("Vertex buffer kotese");
+
             Gl.BufferData(GLEnum.ArrayBuffer, (ReadOnlySpan<float>)vertexArray.AsSpan(), GLEnum.StaticDraw);
+            CheckGlError("Vertex adatok feltoltese");
+
             Gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 0, null);
-            Gl.EnableVertexAttribArray(0);
+
+            // Uj: 6-os tesztben a 0-s attribútum marad kikapcsolva.
+            if (TestError != 6)
+            {
+                Gl.EnableVertexAttribArray(0);
+            }
+            else
+            {
+                Console.WriteLine("Teszt 6: a 0-as vertexattribútum engedelyezese kimaradt.");
+            }
+
+            CheckGlError("Vertex attribútum beallitasa");
+
+            // Uj: 7-es tesztben rossz attribútumindexet engedelyezunk.
+            if (TestError == 7)
+            {
+                Gl.EnableVertexAttribArray(5);
+                Console.WriteLine("Teszt 7: az 5-os attribútum engedelyezve, a 0-s letiltva.");
+            }
+
+            CheckGlError("Vertex attribútum beallitasa");
 
             uint colors = Gl.GenBuffer();
             Gl.BindBuffer(GLEnum.ArrayBuffer, colors);
+            CheckGlError("Color buffer kotese");
+
             Gl.BufferData(GLEnum.ArrayBuffer, (ReadOnlySpan<float>)colorArray.AsSpan(), GLEnum.StaticDraw);
+            CheckGlError("Color adatok feltoltese");
+
             Gl.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, 0, null);
             Gl.EnableVertexAttribArray(1);
+            CheckGlError("Szin attribútum beallitasa");
 
             uint indices = Gl.GenBuffer();
             Gl.BindBuffer(GLEnum.ElementArrayBuffer, indices);
+            CheckGlError("Index buffer kotese");
+
             Gl.BufferData(GLEnum.ElementArrayBuffer, (ReadOnlySpan<uint>)indexArray.AsSpan(), GLEnum.StaticDraw);
+            CheckGlError("Index adatok feltoltese");
 
             Gl.BindBuffer(GLEnum.ArrayBuffer, 0);
+            CheckGlError("Array buffer levalasztasa");
 
             Gl.UseProgram(program);
+            CheckGlError("Shader program aktivalasa");
 
             Gl.DrawElements(GLEnum.Triangles, (uint)indexArray.Length, GLEnum.UnsignedInt, null); // we used element buffer
+            CheckGlError("DrawElements");
+
             Gl.BindBuffer(GLEnum.ElementArrayBuffer, 0);
             Gl.BindVertexArray(vao);
 
@@ -155,6 +281,7 @@ namespace Lab1
             Gl.DeleteBuffer(colors);
             Gl.DeleteBuffer(indices);
             Gl.DeleteVertexArray(vao);
+            CheckGlError("Bufferek es VAO torlese");
         }
     }
 }
