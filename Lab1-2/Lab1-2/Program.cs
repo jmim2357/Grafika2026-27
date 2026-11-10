@@ -1,7 +1,7 @@
 ﻿using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 
-namespace Szeminarium1
+namespace Lab1
 {
     internal static class Program
     {

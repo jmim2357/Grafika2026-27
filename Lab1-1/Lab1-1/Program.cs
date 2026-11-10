@@ -24,7 +24,7 @@ namespace Lab1
         // 8 = hibas vertexindex
         // 9 = BufferData elott nincs buffer kotve
         // 10 = LinkProgram a CompileShader elott
-        private static int TestError = 9;
+        private static int TestError = 4;
 
         // Uj: OpenGL globalis hibakezeles
         private static void CheckGlError(string location)
@@ -226,11 +226,11 @@ namespace Lab1
             Gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 0, null);
 
             // Uj: 6-os tesztben a 0-s attribútum marad kikapcsolva.
-            if (TestError != 6)
+            if (TestError != 6 && TestError !=7)
             {
                 Gl.EnableVertexAttribArray(0);
             }
-            else
+            else if(TestError==6)
             {
                 Console.WriteLine("Teszt 6: a 0-as vertexattribútum engedelyezese kimaradt.");
             }
