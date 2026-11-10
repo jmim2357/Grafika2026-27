@@ -3,7 +3,7 @@ using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 
-namespace Szeminarium1
+namespace Lab2
 {
     internal static class Program
     {
